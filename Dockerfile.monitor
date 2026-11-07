@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY guard/ /app/guard/
+COPY examples/ /app/examples/
+RUN groupadd --gid 10002 monitor && useradd --uid 10002 --gid 10002 --no-create-home monitor
+USER 10002:10002
+CMD ["python", "-m", "guard.monitor", "--in-cluster", "--namespace", "infraguard-lab", "--rollout", "checkout", "--prometheus", "http://infraguard-prometheus.infraguard-lab.svc.cluster.local:9090", "--policy", "examples/lab-policy.json", "--iterations", "0", "--interval", "5"]

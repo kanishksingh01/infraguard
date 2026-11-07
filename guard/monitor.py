@@ -12,12 +12,13 @@ from guard.cli import load_thresholds
 from guard.policy import Evaluator
 from guard.prometheus import fetch_scalar, PrometheusError
 from guard.kubernetes import get_rollout, KubernetesError, combine_rollout_and_slo
+from guard.kubeclient import get_rollout_incluster
 
 def monitor(namespace, name, prometheus, policy, *, iterations=3, interval=10,
-            context=None, sleeper=time.sleep):
+            context=None, in_cluster=False, sleeper=time.sleep):
     if not isinstance(iterations, int) or iterations < 0 or interval < 0:
         raise ValueError("iterations must be nonnegative and interval nonnegative")
-    if not context:
+    if not in_cluster and not context:
         raise ValueError("explicit Kubernetes context is required")
     thresholds = load_thresholds(policy)
     evaluator = Evaluator(thresholds)
@@ -27,7 +28,8 @@ def monitor(namespace, name, prometheus, policy, *, iterations=3, interval=10,
             sleeper(interval)
         index += 1
         try:
-            state = get_rollout(namespace, name, context=context)
+            state = (get_rollout_incluster(namespace, name) if in_cluster
+                     else get_rollout(namespace, name, context=context))
         except KubernetesError:
             state = None
         samples = {}
@@ -48,7 +50,8 @@ def main():
     parser = argparse.ArgumentParser(description="Continuous read-only InfraGuard SLO monitor")
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--rollout", required=True)
-    parser.add_argument("--context", required=True)
+    parser.add_argument("--context", help="Explicit kubeconfig context for external mode")
+    parser.add_argument("--in-cluster", action="store_true", help="Use Kubernetes ServiceAccount API credentials")
     parser.add_argument("--prometheus", required=True)
     parser.add_argument("--policy", default="examples/lab-policy.json")
     parser.add_argument("--iterations", type=int, default=3,
@@ -58,7 +61,8 @@ def main():
     try:
         for decision in monitor(args.namespace, args.rollout, args.prometheus,
                                 args.policy, iterations=args.iterations,
-                                interval=args.interval, context=args.context):
+                                interval=args.interval, context=args.context,
+                                in_cluster=args.in_cluster):
             print(json.dumps(decision), flush=True)
     except (OSError, ValueError, TypeError, KeyError) as exc:
         print(json.dumps({"error": str(exc), "action_executed": False}), file=sys.stderr)

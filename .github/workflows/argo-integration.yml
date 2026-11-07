@@ -39,6 +39,8 @@ jobs:
         run: |
           docker build -t infraguard-lab:dev .
           kind load docker-image infraguard-lab:dev --name infraguard
+          docker build -f Dockerfile.monitor -t infraguard-monitor:dev .
+          kind load docker-image infraguard-monitor:dev --name infraguard
       - name: Install pinned Argo Rollouts controller
         run: |
           kubectl --context kind-infraguard create namespace argo-rollouts
@@ -55,6 +57,10 @@ jobs:
           kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
           kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-fault-lab --timeout=180s
           kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-prometheus --timeout=180s
+          kubectl --context kind-infraguard apply -f deploy/monitor.yaml
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-monitor --timeout=180s
+          kubectl --context kind-infraguard -n infraguard-lab auth can-i get rollouts.argoproj.io --as=system:serviceaccount:infraguard-lab:infraguard-monitor | grep -qx yes
+          kubectl --context kind-infraguard -n infraguard-lab auth can-i patch rollouts.argoproj.io --as=system:serviceaccount:infraguard-lab:infraguard-monitor | grep -qx no
       - name: Verify live canary abort
         run: python -m lab.argo_metrics_smoke
       - name: Upload evidence and audit records
@@ -74,3 +80,4 @@ jobs:
           kubectl --context kind-infraguard -n infraguard-lab describe rollout checkout || true
           kubectl --context kind-infraguard -n infraguard-lab describe pods || true
           kubectl --context kind-infraguard -n argo-rollouts logs deployment/argo-rollouts --tail=120 || true
+          kubectl --context kind-infraguard -n infraguard-lab logs deployment/infraguard-monitor --tail=100 || true
