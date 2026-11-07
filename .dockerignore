@@ -2,8 +2,6 @@
 .github
 __pycache__
 *.pyc
-*.json
 tests
 docs
-guard
 deploy
