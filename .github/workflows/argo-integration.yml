@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - deploy/argo-rollout.yaml
+      - deploy/monitor.yaml
+      - Dockerfile.monitor
+      - .dockerignore
+      - guard/monitor.py
+      - guard/kubeclient.py
       - lab/argo_smoke.py
       - lab/argo_metrics_smoke.py
       - deploy/prometheus.yaml
