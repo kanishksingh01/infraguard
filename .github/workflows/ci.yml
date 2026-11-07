@@ -16,3 +16,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Syntax check
         run: python -m compileall -q lab tests
+      - name: Local experiment smoke test
+        run: python -m lab.experiment --requests 12 --concurrency 2 --output ci-experiment.json
