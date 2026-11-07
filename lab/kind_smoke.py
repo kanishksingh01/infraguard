@@ -69,7 +69,6 @@ def main():
     report = smoke(args.url.rstrip("/"), args.requests, args.concurrency)
     with open(args.output, "w", encoding="utf-8") as file:
         json.dump(report, file, indent=2)
-        file.write("\\n")
 
 if __name__ == "__main__":
     main()
