@@ -36,13 +36,18 @@ jobs:
           kubectl --context kind-infraguard -n infraguard-lab port-forward service/infraguard-fault-lab 18088:8088 > /tmp/infraguard-forward.log 2>&1 &
           PORT_FORWARD_PID=$!
           trap 'kill "$PORT_FORWARD_PID" 2>/dev/null || true; kubectl --context kind-infraguard -n infraguard-lab get pods -o wide || true; cat /tmp/infraguard-forward.log || true' EXIT
-          python -m lab.kind_smoke --url http://127.0.0.1:18088 --requests 40 --concurrency 4
+          for trial in 1 2 3; do
+            python -m lab.kind_smoke --url http://127.0.0.1:18088 --requests 40 --concurrency 4 --output kind-report-${trial}.json
+          done
+          python -m lab.aggregate kind-report-1.json kind-report-2.json kind-report-3.json --output kind-summary.json
       - name: Store synthetic fault experiment report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: infraguard-kind-report
-          path: kind-report.json
+          path: |
+            kind-report-*.json
+            kind-summary.json
           if-no-files-found: ignore
           retention-days: 14
       - name: Kubernetes diagnostics on failure
