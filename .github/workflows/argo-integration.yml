@@ -40,7 +40,7 @@ jobs:
       - name: Install pinned Argo Rollouts controller
         run: |
           kubectl --context kind-infraguard create namespace argo-rollouts
-          kubectl --context kind-infraguard apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.10.2/install.yaml
+          kubectl --context kind-infraguard apply --server-side --force-conflicts -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.10.2/install.yaml
           kubectl --context kind-infraguard -n argo-rollouts rollout status deployment/argo-rollouts --timeout=180s
       - name: Create isolated lab and canary
         run: |
