@@ -7,6 +7,24 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+def prometheus_metrics(snapshot):
+    """Expose counters and gauges via Prometheus text exposition format."""
+    metrics = {
+        "infraguard_gateway_requests_total": ("counter", snapshot["gateway_requests"]),
+        "infraguard_gateway_success_total": ("counter", snapshot["gateway_success"]),
+        "infraguard_gateway_errors_total": ("counter", snapshot["gateway_errors"]),
+        "infraguard_backend_attempts_total": ("counter", snapshot["backend_attempts"]),
+        "infraguard_backend_rejected_total": ("counter", snapshot["backend_rejected"]),
+        "infraguard_backend_active": ("gauge", snapshot["active_backend"]),
+        "infraguard_backend_peak_active": ("gauge", snapshot["peak_active_backend"]),
+        "infraguard_backend_capacity": ("gauge", snapshot["capacity"]),
+        "infraguard_fanout": ("gauge", snapshot["fanout"]),
+    }
+    lines = []
+    for name, (kind, value) in metrics.items():
+        lines.extend((f"# TYPE {name} {kind}", f"{name} {int(value)}"))
+    return "\\n".join(lines) + "\\n"
+
 MAX_FANOUT = 8
 DEFAULT_CAPACITY = 8
 BACKEND_DELAY_SECONDS = 0.025
@@ -82,6 +100,13 @@ def make_handler(state):
             if route == "/request":
                 ok = state.request()
                 self.respond(200 if ok else 503, {"ok": ok})
+            elif route == "/prometheus":
+                payload = prometheus_metrics(state.snapshot()).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
             elif route in ("/metrics", "/health"):
                 self.respond(200, state.snapshot())
             else:

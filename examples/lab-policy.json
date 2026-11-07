@@ -1,0 +1,16 @@
+{
+  "thresholds": [
+    {
+      "name": "gateway_error_ratio",
+      "query": "sum(rate(infraguard_gateway_errors_total[30s])) / clamp_min(sum(rate(infraguard_gateway_requests_total[30s])), 0.001)",
+      "maximum": 0.05,
+      "consecutive_breaches": 2
+    },
+    {
+      "name": "backend_rejections_per_second",
+      "query": "sum(rate(infraguard_backend_rejected_total[30s]))",
+      "maximum": 0.01,
+      "consecutive_breaches": 2
+    }
+  ]
+}

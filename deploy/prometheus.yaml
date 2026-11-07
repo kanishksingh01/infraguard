@@ -1,0 +1,86 @@
+# Prometheus for isolated disposable Kind lab only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: infraguard-prometheus-config
+  namespace: infraguard-lab
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+    scrape_configs:
+      - job_name: infraguard-fault-lab
+        metrics_path: /prometheus
+        static_configs:
+          - targets: ["infraguard-fault-lab.infraguard-lab.svc.cluster.local:8088"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infraguard-prometheus
+  namespace: infraguard-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infraguard-prometheus
+  template:
+    metadata:
+      labels:
+        app: infraguard-prometheus
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.5.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=1d
+          ports:
+            - containerPort: 9090
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: infraguard-prometheus-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infraguard-prometheus
+  namespace: infraguard-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: infraguard-prometheus
+  ports:
+    - port: 9090
+      targetPort: http
+      name: http
