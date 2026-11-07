@@ -116,16 +116,21 @@ def main():
                            samples=2, interval=5, context=LAB_CONTEXT)
         if evidence["decision"] != "ABORT_RECOMMENDED":
             raise AssertionError(f"unexpected SLO decision: {evidence}")
-        outcome = abort_with_preconditions(NAME, evidence, approved=True)
+        abort_started = time.monotonic()
+        outcome = abort_with_preconditions(NAME, evidence, approved=True,
+                                           audit_path="argo-abort-audit.jsonl")
         last, state = wait_for_rollout(
             lambda d, s: bool((d.get("status") or {}).get("abort"))
             or s.phase == "Degraded", "aborted")
-        print(json.dumps({"baseline": baseline, "prometheus_samples": measurements,
+        report = {"baseline": baseline, "prometheus_samples": measurements,
                           "slo_decision": evidence["decision"],
                           "abort_outcome": outcome, "rollout_phase": state.phase,
                           "load_cycles": len(observations),
-                          "metric_origin": "real Prometheus scrape of synthetic workload"},
-                         indent=2))
+                          "abort_state_observed_seconds": round(time.monotonic()-abort_started, 3),
+                          "metric_origin": "real Prometheus scrape of synthetic workload"}
+        print(json.dumps(report, indent=2))
+        with open("argo-metrics-report.json", "w", encoding="utf-8") as stream:
+            json.dump(report, stream, indent=2)
     finally:
         stop.set()
         if worker:

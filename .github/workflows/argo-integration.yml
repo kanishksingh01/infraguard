@@ -53,6 +53,16 @@ jobs:
           kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-prometheus --timeout=180s
       - name: Verify live canary abort
         run: python -m lab.argo_metrics_smoke
+      - name: Upload evidence and audit records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infraguard-argo-evidence
+          path: |
+            argo-metrics-report.json
+            argo-abort-audit.jsonl
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Diagnostics on failure
         if: failure()
         run: |
