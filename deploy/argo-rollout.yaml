@@ -1,0 +1,55 @@
+# Disposable Kind-only canary for testing Argo Rollouts state and abort preconditions.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: checkout
+  namespace: infraguard-lab
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: infraguard-canary
+  template:
+    metadata:
+      labels:
+        app: infraguard-canary
+      annotations:
+        infraguard.dev/revision: "v1"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: infraguard-lab:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8088
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+  strategy:
+    canary:
+      steps:
+        - setWeight: 50
+        - pause: {}

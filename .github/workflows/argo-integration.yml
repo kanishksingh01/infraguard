@@ -1,0 +1,57 @@
+name: Argo Rollouts Integration
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/argo-rollout.yaml
+      - lab/argo_smoke.py
+      - guard/remediation.py
+      - .github/workflows/argo-integration.yml
+  pull_request:
+    paths:
+      - deploy/argo-rollout.yaml
+      - lab/argo_smoke.py
+      - guard/remediation.py
+      - .github/workflows/argo-integration.yml
+permissions:
+  contents: read
+concurrency:
+  group: infraguard-argo-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  argo-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.13.0
+        with:
+          cluster_name: infraguard
+          config: deploy/kind-config.yaml
+          wait: 120s
+      - name: Build and load test image
+        run: |
+          docker build -t infraguard-lab:dev .
+          kind load docker-image infraguard-lab:dev --name infraguard
+      - name: Install pinned Argo Rollouts controller
+        run: |
+          kubectl --context kind-infraguard create namespace argo-rollouts
+          kubectl --context kind-infraguard apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.10.2/install.yaml
+          kubectl --context kind-infraguard -n argo-rollouts rollout status deployment/argo-rollouts --timeout=180s
+      - name: Create isolated lab and canary
+        run: |
+          kubectl --context kind-infraguard apply -f deploy/lab.yaml
+          kubectl --context kind-infraguard apply -f deploy/argo-rollout.yaml
+      - name: Verify live canary abort
+        run: python -m lab.argo_smoke
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context kind-infraguard -n infraguard-lab get rollouts,pods,replicasets -o wide || true
+          kubectl --context kind-infraguard -n infraguard-lab describe rollout checkout || true
+          kubectl --context kind-infraguard -n infraguard-lab describe pods || true
+          kubectl --context kind-infraguard -n argo-rollouts logs deployment/argo-rollouts --tail=120 || true
