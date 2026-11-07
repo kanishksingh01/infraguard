@@ -1,0 +1,16 @@
+{
+  "thresholds": [
+    {
+      "name": "error_ratio",
+      "query": "sum(rate(http_requests_total{status=~\"5..\"}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 1)",
+      "maximum": 0.05,
+      "consecutive_breaches": 2
+    },
+    {
+      "name": "p99_latency_seconds",
+      "query": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[2m])))",
+      "maximum": 1.0,
+      "consecutive_breaches": 2
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+"""InfraGuard deterministic SLO gate (P1 read-only)."""
