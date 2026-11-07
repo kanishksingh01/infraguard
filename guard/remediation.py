@@ -51,7 +51,7 @@ def abort_with_preconditions(name, evidence, *, approved=False, run=subprocess.r
     if not isinstance(original, dict):
         raise RemediationError("missing rollout evidence")
     document, state = read_raw_rollout(name, run=run)
-    for field in ("name", "namespace", "generation"):
+    for field in ("name", "namespace", "generation", "uid"):
         if original.get(field) != getattr(state, field):
             raise RemediationError("rollout changed since SLO evaluation")
     if state.phase not in ("Progressing", "Paused") or state.reconciling:

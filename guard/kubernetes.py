@@ -33,6 +33,7 @@ class RolloutState:
     desired_replicas: int
     paused: bool
     reconciling: bool
+    uid: str | None = None
 
     def as_dict(self):
         return asdict(self)
@@ -67,6 +68,7 @@ def parse_rollout(document: dict) -> RolloutState:
         current_step_index=step, ready_replicas=ready, desired_replicas=desired,
         paused=bool(status.get("pauseConditions")) or bool(spec.get("paused", False)),
         reconciling=reconciling,
+        uid=metadata.get("uid"),
     )
 
 def get_rollout(namespace: str, name: str, *, kubectl: str = "kubectl", timeout: float = 8, context: str | None = None) -> RolloutState:

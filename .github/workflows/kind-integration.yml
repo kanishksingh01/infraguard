@@ -5,6 +5,9 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: infraguard-kind-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   kind-smoke:
     runs-on: ubuntu-latest
@@ -39,4 +42,5 @@ jobs:
         run: |
           kubectl --context kind-infraguard -n infraguard-lab get pods -o wide || true
           kubectl --context kind-infraguard -n infraguard-lab describe deployment infraguard-fault-lab || true
+          kubectl --context kind-infraguard -n infraguard-lab describe pods -l app=infraguard-fault-lab || true
           kubectl --context kind-infraguard -n infraguard-lab logs deployment/infraguard-fault-lab --tail=80 || true

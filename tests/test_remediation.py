@@ -56,6 +56,14 @@ class RemediationTests(unittest.TestCase):
         with self.assertRaisesRegex(RemediationError, "changed"):
             abort_with_preconditions("checkout", evidence(), approved=True, run=runner)
 
+    def test_recreated_rollout_same_generation_is_refused(self):
+        changed = sample()
+        changed["metadata"]["uid"] = "recreated-uid"
+        def runner(*args, **kwargs):
+            return Mock(returncode=0, stdout=json.dumps(changed))
+        with self.assertRaisesRegex(RemediationError, "changed"):
+            abort_with_preconditions("checkout", evidence(), approved=True, run=runner)
+
     def test_patch_conflict_refuses_success(self):
         calls = []
         def runner(command, **kwargs):
