@@ -1,0 +1,82 @@
+name: Repeated Canary Recovery Evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - lab/aggregate_coupled.py
+      - tests/test_aggregate_coupled.py
+      - .github/workflows/coupled-repeatability.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: infraguard-repeat-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  trial:
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: helm/kind-action@v1.13.0
+        with:
+          cluster_name: infraguard
+          config: deploy/kind-config.yaml
+          wait: 120s
+      - name: Build and load synthetic workloads
+        run: |
+          docker build -t infraguard-lab:dev .
+          kind load docker-image infraguard-lab:dev --name infraguard
+      - name: Install pinned Argo Rollouts and test workload
+        run: |
+          kubectl --context kind-infraguard create namespace argo-rollouts
+          kubectl --context kind-infraguard apply --server-side --force-conflicts -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.10.2/install.yaml
+          kubectl --context kind-infraguard -n argo-rollouts rollout status deploy/argo-rollouts --timeout=180s
+          kubectl --context kind-infraguard apply -f deploy/lab.yaml
+          kubectl --context kind-infraguard apply -f deploy/argo-rollout.yaml
+          kubectl --context kind-infraguard apply -f deploy/remediation-rbac.yaml
+          kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deploy/infraguard-prometheus --timeout=180s
+      - name: Run independent coupled canary trial
+        run: python -m lab.coupled_canary
+      - name: Preserve per-trial evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coupled-trial-${{ matrix.trial }}
+          path: |
+            coupled-canary-report.json
+            coupled-abort-audit.jsonl
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context kind-infraguard -n infraguard-lab get pods,rollouts,services -o wide || true
+          kubectl --context kind-infraguard -n argo-rollouts logs deploy/argo-rollouts --tail=80 || true
+  aggregate:
+    needs: trial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coupled-trial-*
+          path: trials
+      - name: Reject missing evidence and calculate cross-trial summary
+        run: python -m lab.aggregate_coupled trials/coupled-trial-*/coupled-canary-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coupled-repeatability-summary
+          path: coupled-repeatability-summary.json
+          retention-days: 30
