@@ -45,12 +45,17 @@ A rollout can seem healthy at the pod level while dramatically increasing downst
 6. **Guarded intervention.** In disposable `kind-infraguard/infraguard-lab` only, the test explicitly permits a JSON Patch that tests the Rollout's UID and resourceVersion before requesting an abort. Default CLI mode is read-only.
 7. **Verify.** The CI integration observes the Argo controller mark the target rollout `Degraded`. A separate P0 test resets the synthetic fault and confirms subsequent requests succeed. **These are different tests**; the Argo abort test does not itself prove application-level recovery.
 
+## New coupled-canary end-to-end test
+
+The [coupled recovery workflow](https://github.com/kanishksingh01/infraguard/actions/runs/42425398415) applies the eightfold backend fanout to the **actual new Argo canary revision**, scrapes that canary's Pod metrics with Prometheus, requires sustained breaches, performs a lab-only guarded abort and verifies stable Service requests succeed afterward. In that single synthetic Kind run: 754/800 canary requests failed; Prometheus observed 93.75% errors; stable-Service post-abort verification passed 24/24; 34.36 seconds elapsed from abort to stable verification. The earlier separate lab-fault and canary tests remain as narrower component checks.
+
 ## 4. How to reproduce (optional; CI runs automatically)
 
 **No local setup is required to review progress.** Check the GitHub Actions workflows for live, disposable test runs:
 - [Python/unit/Docker CI](../.github/workflows/ci.yml)
 - [Real Kind workload and reset verification](../.github/workflows/kind-integration.yml)
 - [Real Argo Rollouts + Prometheus SLO integration](../.github/workflows/argo-integration.yml)
+- [Coupled faulty canary and recovery verification](../.github/workflows/coupled-canary.yml)
 
 For a code-only local demonstration, from the repo root with Python 3.10+:
 
@@ -67,7 +72,7 @@ In one successful **Kind synthetic fault** run, baseline requests were 40/40 suc
 
 In a separate successful **Argo/Prometheus** run, Prometheus measured a simulated-workload error ratio of ~0.973 and backend rejections ~162.26/s. The policy recommended abort, a Kind-limited patch succeeded, and the Argo Rollout became `Degraded`. [End-to-end workflow run](https://github.com/kanishksingh01/infraguard/actions/runs/42398095089).
 
-The repository's `docs/BENCHMARK.md` distinguishes a manual reset verification duration from autonomous MTTR. We have **not** measured automatic application-level recovery or statistically robust confidence intervals yet.
+The repository's `docs/BENCHMARK.md` distinguishes a manual reset verification duration from autonomous MTTR. A newer coupled-canary run now verifies application-level service recovery after abort in a disposable Kind cluster, though statistically robust confidence intervals and production MTTR remain unmeasured.
 
 ## 6. Where the code lives
 
@@ -85,8 +90,8 @@ The repository's `docs/BENCHMARK.md` distinguishes a manual reset verification d
 
 - No production-grade reconciliation controller or Kubernetes watch loop yet.
 - No audit storage, robust SLO rollout policy configuration, or production authorization model.
-- The lab-only abort test uses a privileged disposable Kind identity; reference least-privilege RBAC is **not yet exercised** by that integration.
-- No proven application-level automatic recovery, rollout safety under real shared backend failures, or validated operating SLO.
+- Lab-only abort now uses an impersonated, namespace-scoped status-patch ServiceAccount, with negative RBAC checks. Independent production credentials are not implemented.
+- One synthetic Kind run proved stable-Service request success after guarded abort; autonomous production recovery and validated real-world SLOs are still unproven.
 - No AI-assisted RCA yet.
 
 ## 8. Roadmap and hiring demonstration

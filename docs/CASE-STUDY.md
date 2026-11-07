@@ -14,6 +14,9 @@ I built an independent laboratory analogue: a Kubernetes-hosted HTTP gateway wit
 
 **Proof:** [Kind benchmark](https://github.com/kanishksingh01/infraguard/actions/runs/42423455935) · [Prometheus/Argo integration](https://github.com/kanishksingh01/infraguard/actions/runs/42424865878).
 
+## Stronger end-to-end evidence
+[Coupled real canary, Prometheus, guarded abort and service recovery](https://github.com/kanishksingh01/infraguard/actions/runs/42425398415): 24/24 stable baseline requests succeeded; 754 of 800 requests to the bad canary failed; Prometheus measured 93.75% canary errors; after guarded abort the stable Service passed 24/24. Abort-to-stable verification: 34.36 seconds in a synthetic Kind run, not production MTTR.
+
 ## Engineering decisions
 - Missing metrics produce HOLD, not PASS.
 - A single spike does not trigger an abort: consecutive breaches are required.
@@ -22,7 +25,7 @@ I built an independent laboratory analogue: a Kubernetes-hosted HTTP gateway wit
 - In-cluster monitoring uses a ServiceAccount GET permission and never patches workloads.
 
 ## Important limitations
-The fault-injection service and the Argo canary are separate components in the current integration. Therefore, observing Argo `Degraded` does **not** prove restored application availability; the manual reset test is a separate recovery observation. The backend capacity model is in-process, not real TCP connection exhaustion. No production traffic, OpenAI infrastructure or employer configuration is involved.
+The original Argo exercise used unrelated lab metrics. A newer, stronger coupled-canary experiment now injects the failure into the real canary Pod and verifies stable-Service recovery after abort (24/24 successful requests) in the same test. That still does not establish production-level recovery reliability. The backend capacity model is in-process, not real TCP connection exhaustion. No production traffic, OpenAI infrastructure or employer configuration is involved.
 
 ## What would make this complete
-Join the unhealthy canary's real traffic to its own SLO gate, measure service-level recovery after abort, add durable tamper-resistant audit and reconciliation leadership, and benchmark against native Argo analysis. See [release gates](RELEASE-STATUS.md) and [full walkthrough](END-TO-END.md).
+Repeat the coupled recovery experiment across varied loads, add durable tamper-resistant audit and reconciliation leadership, and benchmark against native Argo analysis. See [release gates](RELEASE-STATUS.md) and [full walkthrough](END-TO-END.md).
