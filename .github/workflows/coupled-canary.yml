@@ -1,0 +1,76 @@
+name: Coupled Canary Recovery Integration
+on:
+  push:
+    branches: [main]
+    paths:
+      - lab/coupled_canary.py
+      - lab/server.py
+      - deploy/argo-rollout.yaml
+      - deploy/prometheus.yaml
+      - deploy/remediation-rbac.yaml
+      - examples/canary-policy.json
+      - guard/remediation.py
+      - guard/kubernetes.py
+      - .github/workflows/coupled-canary.yml
+  pull_request:
+    paths:
+      - lab/coupled_canary.py
+      - lab/server.py
+      - deploy/argo-rollout.yaml
+      - deploy/prometheus.yaml
+      - examples/canary-policy.json
+      - .github/workflows/coupled-canary.yml
+permissions:
+  contents: read
+concurrency:
+  group: infraguard-coupled-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  coupled-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: helm/kind-action@v1.13.0
+        with:
+          cluster_name: infraguard
+          config: deploy/kind-config.yaml
+          wait: 120s
+      - name: Build and load isolated test image
+        run: |
+          docker build -t infraguard-lab:dev .
+          kind load docker-image infraguard-lab:dev --name infraguard
+      - name: Install Argo Rollouts
+        run: |
+          kubectl --context kind-infraguard create namespace argo-rollouts
+          kubectl --context kind-infraguard apply --server-side --force-conflicts -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.10.2/install.yaml
+          kubectl --context kind-infraguard -n argo-rollouts rollout status deploy/argo-rollouts --timeout=180s
+      - name: Deploy real canary, Prometheus and RBAC
+        run: |
+          kubectl --context kind-infraguard apply -f deploy/lab.yaml
+          kubectl --context kind-infraguard apply -f deploy/argo-rollout.yaml
+          kubectl --context kind-infraguard apply -f deploy/remediation-rbac.yaml
+          kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deploy/infraguard-prometheus --timeout=180s
+      - name: Measure bad canary and stable-service recovery
+        run: python -m lab.coupled_canary
+      - name: Upload coupled fault/recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infraguard-coupled-recovery
+          path: |
+            coupled-canary-report.json
+            coupled-abort-audit.jsonl
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Debug ephemeral lab on failure
+        if: failure()
+        run: |
+          kubectl --context kind-infraguard -n infraguard-lab get rollouts,pods,replicasets,services -o wide || true
+          kubectl --context kind-infraguard -n infraguard-lab describe rollout checkout || true
+          kubectl --context kind-infraguard -n infraguard-lab logs deploy/infraguard-prometheus --tail=100 || true
+          kubectl --context kind-infraguard -n argo-rollouts logs deploy/argo-rollouts --tail=100 || true
