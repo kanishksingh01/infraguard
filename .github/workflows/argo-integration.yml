@@ -5,6 +5,8 @@ on:
     paths:
       - deploy/argo-rollout.yaml
       - lab/argo_smoke.py
+      - lab/argo_metrics_smoke.py
+      - deploy/prometheus.yaml
       - guard/remediation.py
       - .github/workflows/argo-integration.yml
   pull_request:
@@ -46,8 +48,11 @@ jobs:
         run: |
           kubectl --context kind-infraguard apply -f deploy/lab.yaml
           kubectl --context kind-infraguard apply -f deploy/argo-rollout.yaml
+          kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-fault-lab --timeout=180s
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-prometheus --timeout=180s
       - name: Verify live canary abort
-        run: python -m lab.argo_smoke
+        run: python -m lab.argo_metrics_smoke
       - name: Diagnostics on failure
         if: failure()
         run: |
