@@ -69,15 +69,21 @@ def parse_rollout(document: dict) -> RolloutState:
         reconciling=reconciling,
     )
 
-def get_rollout(namespace: str, name: str, *, kubectl: str = "kubectl", timeout: float = 8) -> RolloutState:
+def get_rollout(namespace: str, name: str, *, kubectl: str = "kubectl", timeout: float = 8, context: str | None = None) -> RolloutState:
     validate_name(namespace, "namespace")
     validate_name(name, "name")
     if timeout <= 0 or timeout > 60:
         raise ValueError("timeout must be in (0,60] seconds")
+    if context is not None:
+        validate_name(context, "context")
+    command = [kubectl]
+    if context is not None:
+        command += ["--context", context]
+    command += ["--namespace", namespace, "get", "rollouts.argoproj.io",
+                name, "-o", "json", "--request-timeout=5s"]
     try:
         result = subprocess.run(
-            [kubectl, "--namespace", namespace, "get", "rollouts.argoproj.io",
-             name, "-o", "json", "--request-timeout=5s"],
+            command,
             capture_output=True, text=True, timeout=timeout, check=False
         )
     except (OSError, subprocess.TimeoutExpired) as exc:

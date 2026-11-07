@@ -51,11 +51,11 @@ def abort_with_preconditions(name, evidence, *, approved=False, run=subprocess.r
     if not isinstance(original, dict):
         raise RemediationError("missing rollout evidence")
     document, state = read_raw_rollout(name, run=run)
-    if state.phase not in ("Progressing", "Paused") or state.reconciling:
-        raise RemediationError("rollout is not an active, observed canary")
     for field in ("name", "namespace", "generation"):
         if original.get(field) != getattr(state, field):
             raise RemediationError("rollout changed since SLO evaluation")
+    if state.phase not in ("Progressing", "Paused") or state.reconciling:
+        raise RemediationError("rollout is not an active, observed canary")
     metadata = document.get("metadata") or {}
     uid = metadata.get("uid")
     rv = metadata.get("resourceVersion")
@@ -94,7 +94,7 @@ def main():
         # Read fresh metrics from the target on *this invocation*. No stored report accepted.
         evidence = observe(LAB_NAMESPACE, args.rollout, args.prometheus,
                            args.policy, samples=2, interval=10,
-                           kubectl="kubectl")
+                           kubectl="kubectl", context=LAB_CONTEXT)
         if not args.execute:
             print(json.dumps({"execution": "disabled", "decision": evidence["decision"]}))
             return 2 if evidence["decision"] == "ABORT_RECOMMENDED" else 3

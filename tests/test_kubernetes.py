@@ -56,6 +56,15 @@ class KubernetesTests(unittest.TestCase):
             self.assertEqual(cmd[3:6], ["get", "rollouts.argoproj.io", "checkout"])
             self.assertNotIn("patch", cmd)
 
+    def test_explicit_context_is_bound_to_observation(self):
+        import json
+        from unittest.mock import Mock
+        with patch("guard.kubernetes.subprocess.run") as runner:
+            runner.return_value = Mock(returncode=0, stdout=json.dumps(rollout()))
+            get_rollout("lab", "checkout", context="kind-infraguard")
+            cmd = runner.call_args.args[0]
+            self.assertEqual(cmd[1:3], ["--context", "kind-infraguard"])
+
     def test_invalid_response(self):
         with self.assertRaises(KubernetesError):
             parse_rollout({"kind": "Deployment"})
