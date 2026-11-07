@@ -1,0 +1,42 @@
+name: Kind Integration
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  kind-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create disposable Kind cluster
+        uses: helm/kind-action@v1.13.0
+        with:
+          cluster_name: infraguard
+          config: deploy/kind-config.yaml
+          wait: 120s
+      - name: Build and load lab image
+        run: |
+          docker build -t infraguard-lab:dev .
+          kind load docker-image infraguard-lab:dev --name infraguard
+      - name: Deploy lab
+        run: |
+          kubectl --context kind-infraguard apply -f deploy/lab.yaml
+          kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-fault-lab --timeout=180s
+      - name: Test fault and Prometheus metrics through Kubernetes Service
+        run: |
+          kubectl --context kind-infraguard -n infraguard-lab port-forward service/infraguard-fault-lab 18088:8088 > /tmp/infraguard-forward.log 2>&1 &
+          PORT_FORWARD_PID=$!
+          trap 'kill "$PORT_FORWARD_PID" 2>/dev/null || true; kubectl --context kind-infraguard -n infraguard-lab get pods -o wide || true; cat /tmp/infraguard-forward.log || true' EXIT
+          python -m lab.kind_smoke --url http://127.0.0.1:18088 --requests 40 --concurrency 4
+      - name: Kubernetes diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context kind-infraguard -n infraguard-lab get pods -o wide || true
+          kubectl --context kind-infraguard -n infraguard-lab describe deployment infraguard-fault-lab || true
+          kubectl --context kind-infraguard -n infraguard-lab logs deployment/infraguard-fault-lab --tail=80 || true
