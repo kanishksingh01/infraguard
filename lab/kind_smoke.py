@@ -62,10 +62,14 @@ def main():
     parser.add_argument("--url", default="http://127.0.0.1:18088")
     parser.add_argument("--requests", type=int, default=40)
     parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--output", default="kind-report.json")
     args = parser.parse_args()
     if args.requests < 1 or not 1 <= args.concurrency <= 8:
         parser.error("requests must be positive and concurrency must be 1..8")
-    smoke(args.url.rstrip("/"), args.requests, args.concurrency)
+    report = smoke(args.url.rstrip("/"), args.requests, args.concurrency)
+    with open(args.output, "w", encoding="utf-8") as file:
+        json.dump(report, file, indent=2)
+        file.write("\\n")
 
 if __name__ == "__main__":
     main()
