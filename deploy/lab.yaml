@@ -1,0 +1,71 @@
+# Isolated P0 lab; no public ingress. Do not use on shared clusters.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infraguard-lab
+  labels:
+    app.kubernetes.io/part-of: infraguard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infraguard-fault-lab
+  namespace: infraguard-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infraguard-fault-lab
+  template:
+    metadata:
+      labels:
+        app: infraguard-fault-lab
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fault-lab
+          image: infraguard-lab:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8088
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infraguard-fault-lab
+  namespace: infraguard-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: infraguard-fault-lab
+  ports:
+    - port: 8088
+      targetPort: http
+      name: http

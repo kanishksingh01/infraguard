@@ -53,7 +53,7 @@ class KubernetesTests(unittest.TestCase):
             state = get_rollout("lab", "checkout")
             self.assertEqual(state.phase, "Progressing")
             cmd = runner.call_args.args[0]
-            self.assertEqual(cmd[2:5], ["get", "rollouts.argoproj.io", "checkout"])
+            self.assertEqual(cmd[3:6], ["get", "rollouts.argoproj.io", "checkout"])
             self.assertNotIn("patch", cmd)
 
     def test_invalid_response(self):

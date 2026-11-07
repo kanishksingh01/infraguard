@@ -105,13 +105,15 @@ def make_handler(state):
 def main():
     parser = argparse.ArgumentParser(description="Local-only InfraGuard fault lab")
     parser.add_argument("--port", type=int, default=8088)
+    parser.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1",
+                        help="0.0.0.0 is for isolated container labs ONLY")
     parser.add_argument("--capacity", type=int, default=DEFAULT_CAPACITY)
     args = parser.parse_args()
     if args.capacity < 1:
         parser.error("capacity must be >= 1")
-    server = ThreadingHTTPServer(("127.0.0.1", args.port),
+    server = ThreadingHTTPServer((args.host, args.port),
                                 make_handler(LabState(args.capacity)))
-    print(f"InfraGuard lab listening on http://127.0.0.1:{args.port}", flush=True)
+    print(f"InfraGuard lab listening on http://{args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

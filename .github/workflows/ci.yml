@@ -15,6 +15,8 @@ jobs:
       - name: Unit and HTTP integration tests
         run: python -m unittest discover -s tests -v
       - name: Syntax check
-        run: python -m compileall -q lab tests
+        run: python -m compileall -q lab guard tests
       - name: Local experiment smoke test
         run: python -m lab.experiment --requests 12 --concurrency 2 --output ci-experiment.json
+      - name: Container build
+        run: docker build -t infraguard-lab:ci .
