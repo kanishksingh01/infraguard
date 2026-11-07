@@ -2,6 +2,7 @@
 import argparse
 import json
 import time
+from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 from lab.load_test import run
@@ -38,13 +39,13 @@ def smoke(base_url, requests=40, concurrency=4):
         with urlopen(base_url + "/prometheus", timeout=3) as response:
             exposition = response.read().decode("utf-8")
         report = {
+            "measured_at_utc": datetime.now(timezone.utc).isoformat(),
             "baseline": baseline, "fault": fault,
             "new_backend_rejections": (
                 fault_metrics["backend_rejected"] - baseline_metrics["backend_rejected"]),
             "new_backend_attempts": (
                 fault_metrics["backend_attempts"] - baseline_metrics["backend_attempts"]),
         }
-        print(json.dumps(report, indent=2))
         if baseline["failed"] != 0:
             raise AssertionError("baseline contains failed requests; lab is not isolated enough")
         if report["new_backend_attempts"] != requests * 8:
@@ -53,6 +54,14 @@ def smoke(base_url, requests=40, concurrency=4):
             raise AssertionError("fault injection did not produce observable backend saturation")
         if "# TYPE infraguard_gateway_errors_total counter\n" not in exposition:
             raise AssertionError("Prometheus exposition is malformed or absent")
+        restored_at = time.perf_counter()
+        set_fanout(base_url, 1)
+        restored = run(base_url + "/request", max(8, concurrency * 2), concurrency)
+        report["post_reset_probe"] = restored
+        report["manual_reset_probe_seconds"] = round(time.perf_counter() - restored_at, 4)
+        if restored["failed"] != 0:
+            raise AssertionError("service did not recover after manual fanout reset")
+        print(json.dumps(report, indent=2))
         return report
     finally:
         set_fanout(base_url, 1)
