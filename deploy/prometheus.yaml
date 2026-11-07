@@ -13,6 +13,19 @@ data:
         metrics_path: /prometheus
         static_configs:
           - targets: ["infraguard-fault-lab.infraguard-lab.svc.cluster.local:8088"]
+      - job_name: infraguard-checkout-pods
+        metrics_path: /prometheus
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [infraguard-lab]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: infraguard-canary
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8088"
+            action: keep
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +42,8 @@ spec:
       labels:
         app: infraguard-prometheus
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: infraguard-prometheus
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -84,3 +98,33 @@ spec:
     - port: 9090
       targetPort: http
       name: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infraguard-prometheus
+  namespace: infraguard-lab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: infraguard-prometheus-pods
+  namespace: infraguard-lab
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: infraguard-prometheus-pods
+  namespace: infraguard-lab
+subjects:
+  - kind: ServiceAccount
+    name: infraguard-prometheus
+    namespace: infraguard-lab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: infraguard-prometheus-pods

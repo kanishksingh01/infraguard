@@ -1,0 +1,16 @@
+{
+  "thresholds": [
+    {
+      "name": "canary_error_ratio",
+      "query": "sum(rate(infraguard_gateway_errors_total{job=\"infraguard-checkout-pods\"}[30s])) / clamp_min(sum(rate(infraguard_gateway_requests_total{job=\"infraguard-checkout-pods\"}[30s])), 0.001)",
+      "maximum": 0.05,
+      "consecutive_breaches": 2
+    },
+    {
+      "name": "canary_backend_rejections_per_second",
+      "query": "sum(rate(infraguard_backend_rejected_total{job=\"infraguard-checkout-pods\"}[30s]))",
+      "maximum": 0.01,
+      "consecutive_breaches": 2
+    }
+  ]
+}

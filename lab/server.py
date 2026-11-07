@@ -1,6 +1,7 @@
 """Local HTTP fault-injection lab. No Kubernetes access or external dependencies."""
 import argparse
 import json
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -136,8 +137,12 @@ def main():
     args = parser.parse_args()
     if args.capacity < 1:
         parser.error("capacity must be >= 1")
-    server = ThreadingHTTPServer((args.host, args.port),
-                                make_handler(LabState(args.capacity)))
+    state = LabState(args.capacity)
+    try:
+        state.configure(int(os.environ.get("INFRAGUARD_FANOUT", "1")))
+    except ValueError as exc:
+        parser.error(f"invalid INFRAGUARD_FANOUT: {exc}")
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(state))
     print(f"InfraGuard lab listening on http://{args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()
