@@ -1,16 +1,11 @@
-# Argo Rollouts integration test (Kind only)
+# End-to-end Argo Rollouts CI
 
-This workflow installs a pinned Argo Rollouts v1.10.2 controller and CRDs in a disposable GitHub-hosted Kind cluster, deploys two lab replicas, changes a pod-template annotation to create a canary, waits for the canary pause and calls the guarded abort status patch.
+The workflow installs Argo Rollouts v1.10.2 into disposable Kind, deploys a canary, waits for a pause, observes the real Rollout, evaluates two consecutive synthetic SLO breaches via a local Prometheus-compatible test server, then applies a guarded abort and verifies the Rollout state.
 
-## Safety and scope
-- All writes are confined to the disposable `kind-infraguard` context in the `infraguard-lab` namespace.
-- Test approval evidence is synthetic and generated inside CI, **not** a real Prometheus evaluation.
-- It validates a specific Argo Rollouts API behavior; it does not validate production-ready incident response.
-- The controller is installed cluster-wide only inside an isolated ephemeral test cluster.
-- There is no route from the workflow to a customer, employer, or production cluster.
+**Real:** Kubernetes, Argo Rollouts, kube API observation, status-subresource patch and controller reconciliation.
 
-## Success criterion
-A new canary reaches a paused state, atomic JSON Patch preconditions pass against the current UID/resourceVersion, the abort status patch succeeds, and the controller reflects aborted/degraded state within 120 seconds.
+**Synthetic:** Prometheus metric samples (0.20 for the test-defined metrics); these represent deterministic test inputs, not incident data or measurements from traffic.
 
-## What remains
-End-to-end *real* Prometheus-based automated recommendations; event-based continuous observation; immutable audit reporting; measured rollback recovery; and expanded RBAC checks.
+The experimental abort uses explicit approval, a pinned Kind context and UID/resourceVersion preconditions. See `deploy/remediation-rbac.yaml` for a proposed namespace-scoped ServiceAccount. The workflow currently uses its disposable Kind context, not that ServiceAccount.
+
+This is NOT evidence of production safety, full Prometheus telemetry, or production rollback performance. Future tests must join real traffic-derived metrics with the Argo recovery path and verify least-privilege identities.

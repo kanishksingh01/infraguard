@@ -1,0 +1,33 @@
+# Reference lab-only identity. Not applied by existing tests.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infraguard-remediator
+  namespace: infraguard-lab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: infraguard-remediator
+  namespace: infraguard-lab
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts"]
+    verbs: ["get"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts/status"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: infraguard-remediator
+  namespace: infraguard-lab
+subjects:
+  - kind: ServiceAccount
+    name: infraguard-remediator
+    namespace: infraguard-lab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: infraguard-remediator
