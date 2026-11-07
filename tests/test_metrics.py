@@ -10,6 +10,8 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("# TYPE infraguard_gateway_requests_total counter", text)
         self.assertIn("infraguard_gateway_requests_total 0", text)
         self.assertIn("infraguard_fanout 1", text)
+        self.assertGreater(len(text.splitlines()), 10)
+        self.assertNotIn(r"\\n", text)
 
     def test_prometheus_endpoint(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(LabState()))

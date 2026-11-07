@@ -23,7 +23,7 @@ def prometheus_metrics(snapshot):
     lines = []
     for name, (kind, value) in metrics.items():
         lines.extend((f"# TYPE {name} {kind}", f"{name} {int(value)}"))
-    return "\\n".join(lines) + "\\n"
+    return "\n".join(lines) + "\n"
 
 MAX_FANOUT = 8
 DEFAULT_CAPACITY = 8
