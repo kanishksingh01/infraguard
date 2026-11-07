@@ -13,6 +13,7 @@ from guard.audit import append_event, AuditError
 
 LAB_CONTEXT = "kind-infraguard"
 LAB_NAMESPACE = "infraguard-lab"
+LAB_SERVICE_ACCOUNT = "system:serviceaccount:infraguard-lab:infraguard-remediator"
 
 class RemediationError(RuntimeError):
     pass
@@ -20,7 +21,7 @@ class RemediationError(RuntimeError):
 def read_raw_rollout(name, run=subprocess.run):
     validate_name(name, "name")
     cmd = ["kubectl", "--context", LAB_CONTEXT, "--namespace", LAB_NAMESPACE,
-           "get", "rollouts.argoproj.io", name, "-o", "json", "--request-timeout=5s"]
+           "--as", LAB_SERVICE_ACCOUNT, "get", "rollouts.argoproj.io", name, "-o", "json", "--request-timeout=5s"]
     try:
         result = run(cmd, capture_output=True, text=True, timeout=8, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -75,7 +76,7 @@ def abort_with_preconditions(name, evidence, *, approved=False, run=subprocess.r
         {"op": "add", "path": "/status/abort", "value": True},
     ]
     command = ["kubectl", "--context", LAB_CONTEXT, "--namespace", LAB_NAMESPACE,
-               "patch", "rollouts.argoproj.io", name, "--subresource=status",
+               "--as", LAB_SERVICE_ACCOUNT, "patch", "rollouts.argoproj.io", name, "--subresource=status",
                "--type=json", "--patch", json.dumps(patch, separators=(",", ":")),
                "--request-timeout=5s"]
     try:

@@ -48,6 +48,10 @@ jobs:
         run: |
           kubectl --context kind-infraguard apply -f deploy/lab.yaml
           kubectl --context kind-infraguard apply -f deploy/argo-rollout.yaml
+          kubectl --context kind-infraguard apply -f deploy/remediation-rbac.yaml
+          kubectl --context kind-infraguard -n infraguard-lab auth can-i get rollouts.argoproj.io --as=system:serviceaccount:infraguard-lab:infraguard-remediator | grep -qx yes
+          kubectl --context kind-infraguard -n infraguard-lab auth can-i patch rollouts.argoproj.io --as=system:serviceaccount:infraguard-lab:infraguard-remediator | grep -qx no
+          kubectl --context kind-infraguard -n infraguard-lab auth can-i delete deployments --as=system:serviceaccount:infraguard-lab:infraguard-remediator | grep -qx no
           kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
           kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-fault-lab --timeout=180s
           kubectl --context kind-infraguard -n infraguard-lab rollout status deployment/infraguard-prometheus --timeout=180s

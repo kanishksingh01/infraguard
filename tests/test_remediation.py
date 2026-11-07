@@ -1,7 +1,7 @@
 import json
 import unittest
 from unittest.mock import Mock, patch
-from guard.remediation import abort_with_preconditions, RemediationError, LAB_CONTEXT
+from guard.remediation import abort_with_preconditions, RemediationError, LAB_CONTEXT, LAB_SERVICE_ACCOUNT
 from guard.kubernetes import parse_rollout
 
 def sample():
@@ -41,6 +41,8 @@ class RemediationTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn(LAB_CONTEXT, calls[0])
         self.assertIn(LAB_CONTEXT, calls[1])
+        self.assertIn(LAB_SERVICE_ACCOUNT, calls[0])
+        self.assertIn(LAB_SERVICE_ACCOUNT, calls[1])
         self.assertIn("--subresource=status", calls[1])
         patch_data = json.loads(calls[1][calls[1].index("--patch") + 1])
         self.assertEqual(patch_data[0]["path"], "/metadata/uid")
