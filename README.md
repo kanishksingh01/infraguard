@@ -10,6 +10,9 @@ InfraGuard models backend call amplification, measures its impact with Prometheu
 
 **Coupled recovery evidence:** [real canary fault → Prometheus SLO → guarded abort → stable Service 24/24 recovered](https://github.com/kanishksingh01/infraguard/actions/runs/42425398415) in disposable Kind; 34.36 s abort-to-verification in one synthetic trial.
 
+
+**Repeatable recovery:** [Three load levels (4/6/8) with 3/3 successful aborts and stable-service recoveries](https://github.com/kanishksingh01/infraguard/actions/runs/42427979374). Median abort-to-verification 34.418 s (synthetic Kind).
+
 **Current status:** Working, CI-tested experimental prototype; not a production controller. The coupled canary recovery lab passed; broader production-grade recovery and hardening remain unproven. AI features deferred.
 
 [CI](.github/workflows/ci.yml) · [Kind benchmark](.github/workflows/kind-integration.yml) · [Argo SLO/abort](.github/workflows/argo-integration.yml) · [Architecture](docs/ARCHITECTURE.md)
