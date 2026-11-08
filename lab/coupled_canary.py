@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from guard.reconciler import Reconciler
 from guard.cli import load_thresholds
 from guard.observe import observe
 from guard.prometheus import fetch_scalar, PrometheusError
@@ -144,13 +145,21 @@ def main():
         else:
             raise AssertionError(f"canary's real Prometheus metrics did not breach: {samples}")
 
-        evidence = observe(LAB_NAMESPACE, NAME, PROM, "examples/canary-policy.json",
-                           samples=2, interval=5, context=LAB_CONTEXT)
-        if evidence["decision"] != "ABORT_RECOMMENDED":
-            raise AssertionError(f"no SLO abort recommendation: {evidence}")
+        # Exercise the actual bounded reconciler against live Kind Argo state
+        # and real Prometheus metrics. Explicit approval exists only inside this
+        # disposable CI lab, never as a default command-line behavior.
+        controller = Reconciler(
+            NAME, PROM, "examples/canary-policy.json",
+            execute=True, approved=True, audit_path="coupled-abort-audit.jsonl")
+        first = controller.step()
+        if first["decision"] not in ("HOLD", "PASS"):
+            raise AssertionError(f"first sample unexpectedly triggered abort: {first}")
+        time.sleep(5)  # ensure independent Prometheus scrape opportunity
         started = time.monotonic()
-        outcome = abort_with_preconditions(
-            NAME, evidence, approved=True, audit_path="coupled-abort-audit.jsonl")
+        evidence = controller.step()
+        if evidence["decision"] != "ABORT_RECOMMENDED" or not controller.acted:
+            raise AssertionError(f"reconciler did not abort the bad canary: {evidence}")
+        outcome = evidence["execution"]
         wait_for(lambda: True if (
             (s := rollout_state()[1]).phase == "Degraded") else None, "aborted Rollout")
 
@@ -176,6 +185,7 @@ def main():
             "faulty_canary_successful_requests": sum(x["successful"] for x in observations),
             "canary_prometheus_samples": samples,
             "slo_decision": evidence["decision"], "guarded_abort": outcome,
+            "reconciler_exercised": True,
             "service_after_abort": recovered,
             "abort_to_stable_service_verification_seconds": round(time.monotonic()-started, 3),
             "fault_isolation": "faulty fanout configured on the Rollout's canary Pod",
