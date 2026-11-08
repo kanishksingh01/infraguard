@@ -1,21 +1,21 @@
-# InfraGuard — Delivery and release gates
+# InfraGuard — Release status and evidence
 
-## Implemented and integration-tested
-- Connection-fanout failure lab, Python tests, Docker image and disposable Kind Deployment.
-- Prometheus counters and real PromQL-based consecutive-breach SLO gate.
-- Real Argo Rollouts canary observation and explicit, lab-only abort.
-- UID/resourceVersion checks, preflight audit records, namespace-restricted ServiceAccount impersonation, and negative RBAC checks.
-- Repeatable synthetic fault-reset Kind reports and Argo audit evidence artifacts.
+## Lab-V1 acceptance
+- [x] Reproducible synthetic connection-amplification failure inside disposable Kubernetes
+- [x] Real Prometheus scrape and deterministic consecutive-breach SLO evaluation
+- [x] Read-only Argo canary state and UID/resourceVersion-guarded, approval-gated abort
+- [x] Audit preflight and namespace-scoped, lab-only remediator identity tests
+- [x] Application-level stable-Service probes after the failed canary is aborted
+- [x] Three **independent Kind trials** with all aborts and post-abort Service checks passing
+- [ ] New varied-load 4/6/8-concurrency repeatability workflow verified (CI pending when updated)
 
-## Still required before claiming an end-to-end finished product
-- [x] Couple fault generation to the actual Argo canary Pod and scrape its own Prometheus SLO evidence.
-- [x] Verify healthy stable-Service responses after guarded abort: 24/24 requests in one synthetic Kind run.
-- [ ] Repeat coupled experiments under varied load to quantify uncertainty in detection and recovery.
-- Validate trusted identity, change approval, audit retention and authorization against realistic threat models.
-- Compare results with native Argo Rollouts analysis and statistically robust repeated benchmarks.
+## Observed evidence
+[Three-trial recovery workflow](https://github.com/kanishksingh01/infraguard/actions/runs/42426511514) passed. Abort-to-stable-Service verification: median 36.767 seconds, range 36.608–37.216 seconds. Faulty canary error ratio: median 92.71%. This is a small synthetic experiment, **not production MTTR**. A varied-load follow-up is defined in `docs/VARIED-LOAD-BENCHMARK.md`.
 
-## Latest coupled experiment
-[Verified Kind/Argo/Prometheus recovery workflow](https://github.com/kanishksingh01/infraguard/actions/runs/42425398415): 754/800 faulty canary calls failed; Prometheus sampled 93.75% errors; the guarded abort succeeded; stable Service passed 24/24 requests after abort. Abort-to-stable-verification was 34.36 s in one synthetic trial, not a production MTTR guarantee.
+## Non-goals for a lab V1
+No changes to external or employer clusters; no real production rollback; no certified reliability SLO; no AI-driven mutation. Lab test artifacts are not immutable audit infrastructure.
 
-## Current release classification
-**Experimental lab prototype, not production-ready.** No production cluster mutations are supported. See [end-to-end walkthrough](END-TO-END.md).
+## Remaining before production consideration
+A real Kubernetes controller/watch/reconciliation loop, durable/secured audit service, authorization and credentials against threat models, native Argo AnalysisTemplate comparator, independently repeated larger-scale benchmarks, and operator-grade deployment guidance.
+
+**Classification: reproducible experimental Kubernetes rollout guard; not production-ready.** [Walkthrough](END-TO-END.md).
