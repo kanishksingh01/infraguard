@@ -18,7 +18,12 @@ def aggregate(reports):
     recovery = []
     fault_ratios = []
     faulty_attempts = 0
+    load_levels = set()
     for index, r in enumerate(reports, 1):
+        concurrency = r.get("fault_load_concurrency")
+        if type(concurrency) is not int or concurrency not in (4, 6, 8):
+            raise ValueError(f"trial {index}: invalid load concurrency")
+        load_levels.add(concurrency)
         if not isinstance(r, dict):
             raise ValueError(f"trial {index}: expected report object")
         for field in ("baseline_service", "service_after_abort"):
@@ -41,7 +46,10 @@ def aggregate(reports):
             "abort_to_stable_service_verification_seconds"))
         fault_ratios.append(fault/(fault+good))
         faulty_attempts += int(fault+good)
+    if load_levels != {4, 6, 8}:
+        raise ValueError("expected three independent load levels 4, 6 and 8")
     return {
+        "tested_load_concurrency_levels": sorted(load_levels),
         "trials": len(reports),
         "scope": "independent synthetic Kind canary trials, not a production SLO or MTTR",
         "verified_abort_and_service_recovery_in_every_trial": True,

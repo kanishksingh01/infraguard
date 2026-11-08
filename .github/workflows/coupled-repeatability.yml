@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - lab/aggregate_coupled.py
+      - lab/coupled_canary.py
       - tests/test_aggregate_coupled.py
       - .github/workflows/coupled-repeatability.yml
   workflow_dispatch:
@@ -17,7 +18,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        trial: [1, 2, 3]
+        include:
+          - trial: 1
+            concurrency: 4
+          - trial: 2
+            concurrency: 6
+          - trial: 3
+            concurrency: 8
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -45,6 +52,8 @@ jobs:
           kubectl --context kind-infraguard apply -f deploy/prometheus.yaml
           kubectl --context kind-infraguard -n infraguard-lab rollout status deploy/infraguard-prometheus --timeout=180s
       - name: Run independent coupled canary trial
+        env:
+          RUN_FANOUT_CONCURRENCY: ${{ matrix.concurrency }}
         run: python -m lab.coupled_canary
       - name: Preserve per-trial evidence
         if: always()

@@ -1,8 +1,9 @@
 import unittest
 from lab.aggregate_coupled import aggregate
 
-def trial(seconds=12, faults=72):
+def trial(seconds=12, faults=72, concurrency=4):
     return {
+        "fault_load_concurrency": concurrency,
         "baseline_service": {"requests": 24, "failed": 0},
         "service_after_abort": {"requests": 24, "failed": 0},
         "slo_decision": "ABORT_RECOMMENDED",
@@ -14,7 +15,7 @@ def trial(seconds=12, faults=72):
 
 class CoupledAggregateTests(unittest.TestCase):
     def test_median_and_bounds(self):
-        a = aggregate([trial(9), trial(12), trial(18)])
+        a = aggregate([trial(9, concurrency=4), trial(12, concurrency=6), trial(18, concurrency=8)])
         self.assertEqual(a["trials"], 3)
         self.assertEqual(a["abort_to_stable_verification_seconds"]["median"], 12)
         self.assertEqual(a["abort_to_stable_verification_seconds"]["min"], 9)
@@ -24,7 +25,7 @@ class CoupledAggregateTests(unittest.TestCase):
         bad = trial()
         bad["service_after_abort"]["failed"] = 2
         with self.assertRaisesRegex(ValueError, "complete availability"):
-            aggregate([trial(), bad, trial()])
+            aggregate([trial(concurrency=4), bad, trial(concurrency=8)])
 
     def test_reject_absent_abort_and_missing_trials(self):
         with self.assertRaisesRegex(ValueError, "three independent"):
@@ -32,11 +33,15 @@ class CoupledAggregateTests(unittest.TestCase):
         bad = trial()
         bad["guarded_abort"]["action_executed"] = False
         with self.assertRaisesRegex(ValueError, "verified abort"):
-            aggregate([trial(), trial(), bad])
+            aggregate([trial(concurrency=4), trial(concurrency=6), bad])
+
+    def test_reject_duplicate_load_levels(self):
+        with self.assertRaisesRegex(ValueError, "independent load levels"):
+            aggregate([trial(), trial(), trial()])
 
     def test_reject_invalid_duration(self):
         with self.assertRaisesRegex(ValueError, "numeric"):
-            aggregate([trial(), trial(float("nan")), trial()])
+            aggregate([trial(concurrency=4), trial(float("nan"), concurrency=6), trial(concurrency=8)])
 
 if __name__ == "__main__":
     unittest.main()

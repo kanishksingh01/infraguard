@@ -4,6 +4,7 @@ Runs ONLY against disposable kind-infraguard, infraguard-lab. Synthetic
 connections/traffic; no real cloud account or production objects.
 """
 import json
+import os
 import subprocess
 import threading
 import time
@@ -81,16 +82,19 @@ def wait_for(predicate, label, timeout=120):
 def rollout_state():
     return read_raw_rollout(NAME)
 
-def load(stop, results):
+def load(stop, results, concurrency):
     while not stop.is_set():
         try:
-            results.append(run(CANARY + "/request", requests=32, concurrency=4))
+            results.append(run(CANARY + "/request", requests=32, concurrency=concurrency))
         except (OSError, URLError, TimeoutError):
             stop.set()
             break
         stop.wait(.2)
 
 def main():
+    load_concurrency = int(os.environ.get("RUN_FANOUT_CONCURRENCY", "4"))
+    if load_concurrency not in (4, 6, 8):
+        raise ValueError("RUN_FANOUT_CONCURRENCY must be 4, 6 or 8 in disposable lab")
     forwards = []
     thread = None
     stop = threading.Event()
@@ -123,7 +127,7 @@ def main():
         bad_name = bad["metadata"]["name"]
         forwards.append(forward("pod/" + bad_name, 18092))
         ready(CANARY + "/health")
-        thread = threading.Thread(target=load, args=(stop, observations), daemon=True)
+        thread = threading.Thread(target=load, args=(stop, observations, load_concurrency), daemon=True)
         thread.start()
 
         thresholds = load_thresholds("examples/canary-policy.json")
@@ -165,6 +169,7 @@ def main():
             raise AssertionError(f"Service unavailable after canary abort: {recovered}")
         report = {
             "measured_at_utc": datetime.now(timezone.utc).isoformat(),
+            "fault_load_concurrency": load_concurrency,
             "baseline_service": baseline,
             "faulty_canary_load_cycles": len(observations),
             "faulty_canary_failed_requests": sum(x["failed"] for x in observations),
