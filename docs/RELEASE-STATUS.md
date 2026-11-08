@@ -2,7 +2,7 @@
 
 ## Lab-V1 acceptance
 - [x] Reproducible synthetic connection-amplification failure inside disposable Kubernetes
-- [x] Real Prometheus scrape and deterministic consecutive-breach SLO evaluation
+- [x] Real Prometheus scrape, deterministic consecutive-breach SLO evaluation and bounded polling reconciler
 - [x] Read-only Argo canary state and UID/resourceVersion-guarded, approval-gated abort
 - [x] Audit preflight and namespace-scoped, lab-only remediator identity tests
 - [x] Application-level stable-Service probes after the failed canary is aborted
@@ -16,6 +16,6 @@
 No changes to external or employer clusters; no real production rollback; no certified reliability SLO; no AI-driven mutation. Lab test artifacts are not immutable audit infrastructure.
 
 ## Remaining before production consideration
-A real Kubernetes controller/watch/reconciliation loop, durable/secured audit service, authorization and credentials against threat models, native Argo AnalysisTemplate comparator, independently repeated larger-scale benchmarks, and operator-grade deployment guidance.
+A production Kubernetes native controller/watch loop (a bounded lab polling reconciler now exists), durable/secured audit service, authorization and credentials against threat models, native Argo AnalysisTemplate comparator, independently repeated larger-scale benchmarks, and operator-grade deployment guidance.
 
 **Classification: reproducible experimental Kubernetes rollout guard; not production-ready.** [Walkthrough](END-TO-END.md).
